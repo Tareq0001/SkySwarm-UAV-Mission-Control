@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl" id="app-root">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkySwarm | Autonomous UAV Swarm GCS & BVLOS Fleet Mission Control</title>
+    <!-- Font Awesome & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-tactical: #05070c;
+            --bg-panel: rgba(10, 14, 24, 0.88);
+            --border-glow: #1a233a;
+            --border-accent: #0ea5e9;
+            --swarm-blue: #0ea5e9;
+            --swarm-green: #10b981;
+            --swarm-amber: #f59e0b;
+            --swarm-red: #ef4444;
+            --swarm-purple: #a855f7;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --font-mono: 'JetBrains Mono', monospace;
+            --font-ui: 'Tajawal', system-ui, sans-serif;
+        }
+
+        html[dir="ltr"] {
+            --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-tactical);
+            color: var(--text-main);
+            font-family: var(--font-ui);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(14, 165, 233, 0.08) 0%, transparent 45%),
+                radial-gradient(circle at 90% 80%, rgba(16, 185, 129, 0.08) 0%, transparent 45%);
+        }
+
+        /* Top Header */
+        header {
+            height: 64px;
+            background: rgba(10, 14, 24, 0.94);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--border-glow);
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand-section {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #0284c7, #6366f1);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #fff;
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.5);
+        }
+
+        .brand-text h1 {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(90deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .brand-text p {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .header-status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.12);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: var(--swarm-green);
+            padding: 4px 14px;
+            border-radius: 9999px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-ui {
+            background: rgba(26, 35, 58, 0.6);
+            border: 1px solid var(--border-glow);
+            color: var(--text-main);
+            padding: 7px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-family: var(--font-mono);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-ui:hover {
+            border-color: var(--swarm-blue);
+            background: #1e293b;
+            color: var(--swarm-blue);
+        }
+
+        .btn-rth {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.4);
+            color: var(--swarm-red);
+            font-weight: 700;
+        }
+
+        .btn-rth:hover {
+            background: var(--swarm-red);
+            color: #fff;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+        }
+
+        /* Main Workspace Layout */
+        .workspace {
+            display: grid;
+            grid-template-columns: 320px 1fr 340px;
+            gap: 16px;
+            padding: 16px 20px;
+            flex: 1;
+            min-height: calc(100vh - 64px);
+        }
+
+        @media (max-width: 1280px) {
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Panel Container */
+        .panel {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-glow);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            background: rgba(10, 14, 24, 0.85);
+            border-bottom: 1px solid var(--border-glow);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-body {
+            padding: 16px;
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Swarm Formation Selector */
+        .formations-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        }
+
+        .form-btn {
+            padding: 8px 6px;
+            text-align: center;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            border: 1px solid var(--border-glow);
+            background: rgba(15, 23, 42, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .form-btn.active {
+            background: #1e293b;
+            color: var(--swarm-blue);
+            border-color: var(--swarm-blue);
+            font-weight: 700;
+        }
+
+        /* Controls */
+        .ctrl-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .ctrl-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+        }
+
+        .ctrl-value {
+            color: var(--swarm-blue);
+            font-weight: 700;
+        }
+
+        .slider-range {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #1e2438;
+            outline: none;
+        }
+
+        .slider-range::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--swarm-blue);
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(14, 165, 233, 0.6);
+            border: 2px solid #fff;
+        }
+
+        /* Center Viewport Container */
+        .viewport-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            position: relative;
+        }
+
+        .tactical-canvas-card {
+            background: #020409;
+            border: 1px solid var(--border-glow);
+            border-radius: 12px;
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 480px;
+        }
+
+        #tacticalCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .tactical-hud {
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            right: 14px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+
+        .hud-tag {
+            background: rgba(10, 14, 24, 0.8);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border-glow);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--swarm-blue);
+        }
+
+        .mavlink-badge {
+            background: rgba(10, 14, 24, 0.85);
+            border: 1px solid var(--swarm-green);
+            color: var(--swarm-green);
+            padding: 6px 14px;
+            border-radius: 9999px;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Bottom Row: FLIR Camera & Telemetry Bus */
+        .bottom-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            height: 190px;
+        }
+
+        .camera-card {
+            background: #000;
+            border: 1px solid var(--border-glow);
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .flir-header {
+            position: absolute;
+            top: 8px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: #22c55e;
+            z-index: 10;
+        }
+
+        #flirCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .mavlink-log-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-glow);
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .log-header {
+            font-size: 11px;
+            font-family: var(--font-mono);
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .log-body {
+            flex: 1;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            overflow-y: auto;
+            color: #38bdf8;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .metric-card {
+            background: rgba(26, 35, 58, 0.4);
+            border: 1px solid var(--border-glow);
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .metric-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+        }
+
+        .metric-val {
+            font-size: 15px;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="brand-section">
+            <div class="brand-logo">
+                <i class="fa-solid fa-satellite-dish"></i>
+            </div>
+            <div class="brand-text">
+                <h1 data-i18n="appTitle">SKY-SWARM GCS | Autonomous UAV Fleet Command</h1>
+                <p data-i18n="appSubtitle">BVLOS Fleet Operations, Reynolds Flocking & MAVLink 2.0 Telemetry</p>
+            </div>
+        </div>
+
+        <div class="header-status-badge">
+            <i class="fa-solid fa-tower-broadcast"></i>
+            <span id="swarmStatusText">SWARM LINK: SYNCHRONIZED (16 DRONES)</span>
+        </div>
+
+        <div class="header-actions">
+            <button class="btn-ui btn-rth" onclick="triggerSwarmRTH()">
+                <i class="fa-solid fa-house-chimney-crack"></i>
+                <span data-i18n="btnRth">FLEET RETURN-TO-HOME (RTH)</span>
+            </button>
+            <button class="btn-ui" onclick="toggleGeofence()">
+                <i class="fa-solid fa-draw-polygon"></i>
+                <span data-i18n="btnGeofence">TOGGLE GEOFENCE</span>
+            </button>
+            <button class="btn-ui" id="langToggleBtn" onclick="toggleLanguage()">
+                <i class="fa-solid fa-globe"></i>
+                <span id="langText">English</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="workspace">
+        
+        <!-- Left Panel: Swarm Coordination & Formation Tuning -->
+        <aside class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <i class="fa-solid fa-circle-nodes text-cyan-400"></i>
+                    <span data-i18n="swarmTitle">Swarm Formation & Flocking</span>
+                </div>
+                <span style="font-size: 10px; color: var(--swarm-green); font-family: var(--font-mono);">MAVLINK 2.0</span>
+            </div>
+
+            <div class="panel-body">
+                <!-- Formation Mode Selector -->
+                <div class="ctrl-group">
+                    <span class="ctrl-header" data-i18n="formationMode">Active Swarm Formation</span>
+                    <div class="formations-grid">
+                        <div class="form-btn active" id="btnFormV" onclick="setFormation('v')"><i class="fa-solid fa-chevron-up"></i> V-SHAPE</div>
+                        <div class="form-btn" id="btnFormGrid" onclick="setFormation('grid')"><i class="fa-solid fa-table-cells"></i> GRID SEARCH</div>
+                        <div class="form-btn" id="btnFormPerimeter" onclick="setFormation('circle')"><i class="fa-solid fa-circle-notch"></i> PERIMETER</div>
+                        <div class="form-btn" id="btnFormLine" onclick="setFormation('line')"><i class="fa-solid fa-arrows-left-right"></i> SWEEP LINE</div>
+                    </div>
+                </div>
+
+                <!-- Swarm Drone Count -->
+                <div class="ctrl-group">
+                    <div class="ctrl-header">
+                        <span data-i18n="droneCount">Active Drone Fleet Size</span>
+                        <span class="ctrl-value" id="valDrones">16 UAVs</span>
+                    </div>
+                    <input type="range" class="slider-range" id="sliderDrones" min="6" max="32" step="2" value="16">
+                </div>
+
+                <!-- Inter-Drone Spacing (m) -->
+                <div class="ctrl-group">
+                    <div class="ctrl-header">
+                        <span data-i18n="swarmSpacing">Separation Distance (Spacing)</span>
+                        <span class="ctrl-value" id="valSpacing">18 m</span>
+                    </div>
+                    <input type="range" class="slider-range" id="sliderSpacing" min="8" max="45" step="1" value="18">
+                </div>
+
+                <!-- Fleet Cruising Altitude (m) -->
+                <div class="ctrl-group">
+                    <div class="ctrl-header">
+                        <span data-i18n="cruiseAlt">Cruising Altitude (MSL)</span>
+                        <span class="ctrl-value" id="valAlt">85 m</span>
+                    </div>
+                    <input type="range" class="slider-range" id="sliderAlt" min="30" max="250" step="5" value="85">
+                </div>
+
+                <!-- Autonomous Flocking Weights -->
+                <div class="ctrl-group">
+                    <div class="ctrl-header">
+                        <span data-i18n="cohesion">Cohesion Attraction Weight</span>
+                        <span class="ctrl-value" id="valCohesion">1.25</span>
+                    </div>
+                    <input type="range" class="slider-range" id="sliderCohesion" min="0.5" max="3.0" step="0.1" value="1.25">
+                </div>
+
+                <!-- Mission Info Guide -->
+                <div style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.3); border-radius: 8px; padding: 12px; font-size: 11px; line-height: 1.6;">
+                    <div style="font-weight: 700; color: #38bdf8; margin-bottom: 4px;" data-i18n="bvlosTitle">BVLOS TACTICAL DOCTRINE</div>
+                    <div data-i18n="bvlosDesc">
+                        Drones communicate via local 5.8GHz ad-hoc mesh. Artificial potential fields prevent mid-air conjunction while maintaining synchronized sweep velocity.
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center: 2D/3D Tactical Radar Map & Real-Time Sensors -->
+        <section class="viewport-container">
+            <div class="tactical-canvas-card">
+                <canvas id="tacticalCanvas"></canvas>
+                
+                <div class="tactical-hud">
+                    <span class="hud-tag" id="hudCoords">HQ: 18.2164° N, 42.5053° E (ABHA)</span>
+                    <div class="mavlink-badge">
+                        <i class="fa-solid fa-signal"></i>
+                        <span>MAVLINK 2.0 BUS: 28 Hz</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Row: Simulated FLIR Thermal Gimbal & Telemetry Bus -->
+            <div class="bottom-row">
+                <!-- Thermal Camera -->
+                <div class="camera-card">
+                    <div class="flir-header">
+                        <span>LEADER FLIR EO/IR</span>
+                        <span style="color: #f59e0b;">FOV: 45° | ZOOM: 3.2X</span>
+                    </div>
+                    <canvas id="flirCanvas"></canvas>
+                </div>
+
+                <!-- MAVLink Packet Log -->
+                <div class="mavlink-log-card">
+                    <div class="log-header">
+                        <span data-i18n="mavlogTitle">LIVE MAVLINK 2.0 PROTOCOL STREAM</span>
+                        <span style="color: #10b981;">CRC: OK</span>
+                    </div>
+                    <div class="log-body" id="mavlogStream">
+                        <div>[00:01] HEARTBEAT: type=UAV_QUADROTOR compid=1 state=ACTIVE</div>
+                        <div>[00:02] GLOBAL_POS_INT: lat=182164000 lon=425053000 alt=85000</div>
+                        <div>[00:03] SYS_STATUS: batt_volt=22400mV current=18.4A drop=0%</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Panel: Fleet Telemetry, Fail-Safe & Battery Management -->
+        <aside class="panel">
+            <div class="panel-header">
+                <div class="panel-title">
+                    <i class="fa-solid fa-shield-halved text-emerald-400"></i>
+                    <span data-i18n="fleetStatus">Fleet Status & Fail-Safe Matrix</span>
+                </div>
+                <span style="font-size: 10px; color: var(--swarm-green); font-family: var(--font-mono);">UTM INTEGRATED</span>
+            </div>
+
+            <div class="panel-body">
+                <!-- Fleet Metrics Grid -->
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <span class="metric-label" data-i18n="activeUAVs">Operational Fleet</span>
+                        <span class="metric-val" id="metricFleet" style="color: #38bdf8;">16 / 16 Units</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label" data-i18n="avgBattery">Avg Battery Reserve</span>
+                        <span class="metric-val" id="metricBatt" style="color: #10b981;">82% (24 min)</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label" data-i18n="swarmSpeed">Formation Speed</span>
+                        <span class="metric-val" id="metricSpeed" style="color: #f59e0b;">54 km/h</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-label" data-i18n="coverageArea">Survey Coverage</span>
+                        <span class="metric-val" id="metricCoverage" style="color: #a855f7;">4.2 km²</span>
+                    </div>
+                </div>
+
+                <!-- Fail-Safe Status Matrix -->
+                <div class="panel-title" style="margin-top: 6px;">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+                    <span data-i18n="failSafeTitle">Dynamic Fail-Safe Monitoring</span>
+                </div>
+
+                <div class="metric-card" style="gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 11px; font-family: var(--font-mono);">
+                        <span>Lost-Link RTH Trigger:</span>
+                        <span style="color: #10b981;">ARMED (< 1.5s timeout)</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 11px; font-family: var(--font-mono);">
+                        <span>Opposing Wind Return Budget:</span>
+                        <span style="color: #10b981;">CALCULATED (Safe)</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 11px; font-family: var(--font-mono);">
+                        <span>ADS-B In Airspace Deconfliction:</span>
+                        <span style="color: #38bdf8;">CLEAR (No Intruder)</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 11px; font-family: var(--font-mono);">
+                        <span>Emergency Parachute Pyros:</span>
+                        <span style="color: #10b981;">STANDBY</span>
+                    </div>
+                </div>
+
+                <!-- Photogrammetry Grid Status -->
+                <div class="panel-title" style="margin-top: 6px;">
+                    <i class="fa-solid fa-camera text-blue-400"></i>
+                    <span data-i18n="photoTitle">Photogrammetry Survey Engine</span>
+                </div>
+
+                <div class="metric-card" style="gap: 6px; font-size: 11px; font-family: var(--font-mono);">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Forward Overlap:</span>
+                        <span style="color: #38bdf8;">80%</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Side Overlap:</span>
+                        <span style="color: #38bdf8;">75%</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Ground Sampling (GSD):</span>
+                        <span style="color: #10b981;">1.8 cm/px</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Images Triggered:</span>
+                        <span style="color: #f59e0b;">482 geotagged</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <script>
+        // Localization Dictionary
+        const I18N = {
+            ar: {
+                appTitle: "SKY-SWARM GCS | محطة القيادة والتحكم بأسراب الدرونز",
+                appSubtitle: "عمليات الأسراب ما وراء مدى الرؤية (BVLOS)، خوارزميات رينولدز، وبروتوكول MAVLink",
+                btnRth: "العودة التلقائية للقاعدة (RTH)",
+                btnGeofence: "تبديل السياج الجغرافي",
+                swarmTitle: "تنسيق وحركة السرب المستقل",
+                formationMode: "تشكيل السرب النشط",
+                droneCount: "عدد طائرات السرب الفعالة",
+                swarmSpacing: "مسافة التباعد بين الطائرات",
+                cruiseAlt: "ارتفاع التحليق (MSL)",
+                cohesion: "معامل التماسك وجذب مركز الكتلة",
+                bvlosTitle: "عقيدة العمليات التكتيكية (BVLOS)",
+                bvlosDesc: "تتواصل الدرونز عبر شبكة محلية تردد 5.8GHz. تمنع حقول الجهد الاصطناعية الاصطدام البيني مع الحفاظ على مسح متزامن.",
+                mavlogTitle: "بث بروتوكول MAVLINK 2.0 الحي",
+                fleetStatus: "حالة الأسطول ومصفوفة الأمان",
+                activeUAVs: "الطائرات العاملة في المهمة",
+                avgBattery: "متوسط احتياطي البطارية",
+                swarmSpeed: "سرعة تقدم التشكيل",
+                coverageArea: "المساحة الممسوحة جوياً",
+                failSafeTitle: "مراقبة آليات الطوارئ الذاتية",
+                photoTitle: "محرك المسح الجغرافي ونمذجة الصور"
+            },
+            en: {
+                appTitle: "SKY-SWARM GCS | Autonomous UAV Fleet Command",
+                appSubtitle: "BVLOS Fleet Operations, Reynolds Flocking & MAVLink 2.0 Telemetry",
+                btnRth: "FLEET RETURN-TO-HOME (RTH)",
+                btnGeofence: "TOGGLE GEOFENCE",
+                swarmTitle: "Swarm Formation & Flocking",
+                formationMode: "Active Swarm Formation",
+                droneCount: "Active Drone Fleet Size",
+                swarmSpacing: "Separation Distance (Spacing)",
+                cruiseAlt: "Cruising Altitude (MSL)",
+                cohesion: "Cohesion Attraction Weight",
+                bvlosTitle: "BVLOS TACTICAL DOCTRINE",
+                bvlosDesc: "Drones communicate via local 5.8GHz ad-hoc mesh. Artificial potential fields prevent mid-air conjunction while maintaining synchronized sweep velocity.",
+                mavlogTitle: "LIVE MAVLINK 2.0 PROTOCOL STREAM",
+                fleetStatus: "Fleet Status & Fail-Safe Matrix",
+                activeUAVs: "Operational Fleet",
+                avgBattery: "Avg Battery Reserve",
+                swarmSpeed: "Formation Speed",
+                coverageArea: "Survey Coverage",
+                failSafeTitle: "Dynamic Fail-Safe Monitoring",
+                photoTitle: "Photogrammetry Survey Engine"
+            }
+        };
+
+        let currentLang = 'ar';
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'ar' ? 'en' : 'ar';
+            document.getElementById('app-root').dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+            document.getElementById('app-root').lang = currentLang;
+            document.getElementById('langText').textContent = currentLang === 'ar' ? 'English' : 'العربية';
+
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (I18N[currentLang][key]) {
+                    el.textContent = I18N[currentLang][key];
+                }
+            });
+        }
+
+        // Swarm Simulation Parameters
+        const swarm = {
+            count: 16,
+            spacing: 18,
+            altitude: 85,
+            cohesion: 1.25,
+            formation: 'v',     // 'v', 'grid', 'circle', 'line'
+            isRTH: false,
+            showGeofence: true,
+            center: { x: 0, y: 0 },
+            target: { x: 0, y: 0 },
+            drones: [],
+            time: 0
+        };
+
+        // Initialize Drones
+        function initDrones() {
+            swarm.drones = [];
+            for (let i = 0; i < swarm.count; i++) {
+                swarm.drones.push({
+                    id: i + 1,
+                    x: (Math.random() - 0.5) * 50,
+                    y: (Math.random() - 0.5) * 50,
+                    vx: 0,
+                    vy: 0,
+                    heading: 0,
+                    battery: 85 - (i * 0.4),
+                    health: 'OK'
+                });
+            }
+        }
+        initDrones();
+
+        // Sliders
+        document.getElementById('sliderDrones').addEventListener('input', (e) => {
+            swarm.count = parseInt(e.target.value);
+            document.getElementById('valDrones').textContent = swarm.count + " UAVs";
+            document.getElementById('metricFleet').textContent = `${swarm.count} / ${swarm.count} Units`;
+            initDrones();
+        });
+        document.getElementById('sliderSpacing').addEventListener('input', (e) => {
+            swarm.spacing = parseFloat(e.target.value);
+            document.getElementById('valSpacing').textContent = swarm.spacing + " m";
+        });
+        document.getElementById('sliderAlt').addEventListener('input', (e) => {
+            swarm.altitude = parseFloat(e.target.value);
+            document.getElementById('valAlt').textContent = swarm.altitude + " m";
+        });
+        document.getElementById('sliderCohesion').addEventListener('input', (e) => {
+            swarm.cohesion = parseFloat(e.target.value);
+            document.getElementById('valCohesion').textContent = swarm.cohesion.toFixed(2);
+        });
+
+        function setFormation(form) {
+            swarm.formation = form;
+            document.querySelectorAll('.form-btn').forEach(b => b.classList.remove('active'));
+            if(form === 'v') document.getElementById('btnFormV').classList.add('active');
+            if(form === 'grid') document.getElementById('btnFormGrid').classList.add('active');
+            if(form === 'circle') document.getElementById('btnFormPerimeter').classList.add('active');
+            if(form === 'line') document.getElementById('btnFormLine').classList.add('active');
+        }
+
+        function triggerSwarmRTH() {
+            swarm.isRTH = !swarm.isRTH;
+            const text = document.getElementById('swarmStatusText');
+            if (swarm.isRTH) {
+                text.textContent = "EMERGENCY RTH IN PROGRESS (ALL DRONES RETURN)";
+                text.parentElement.style.color = "#ef4444";
+                text.parentElement.style.borderColor = "rgba(239, 68, 68, 0.4)";
+                text.parentElement.style.background = "rgba(239, 68, 68, 0.15)";
+            } else {
+                text.textContent = `SWARM LINK: SYNCHRONIZED (${swarm.count} DRONES)`;
+                text.parentElement.style.color = "#10b981";
+                text.parentElement.style.borderColor = "rgba(16, 185, 129, 0.35)";
+                text.parentElement.style.background = "rgba(16, 185, 129, 0.12)";
+            }
+        }
+
+        function toggleGeofence() {
+            swarm.showGeofence = !swarm.showGeofence;
+        }
+
+        // Tactical Canvas Setup
+        const canvasT = document.getElementById('tacticalCanvas');
+        const ctxT = canvasT.getContext('2d');
+        const canvasF = document.getElementById('flirCanvas');
+        const ctxF = canvasF.getContext('2d');
+
+        function resizeCanvases() {
+            const tRect = canvasT.parentElement.getBoundingClientRect();
+            canvasT.width = tRect.width * window.devicePixelRatio;
+            canvasT.height = tRect.height * window.devicePixelRatio;
+
+            const fRect = canvasF.parentElement.getBoundingClientRect();
+            canvasF.width = fRect.width * window.devicePixelRatio;
+            canvasF.height = fRect.height * window.devicePixelRatio;
+        }
+        window.addEventListener('resize', resizeCanvases);
+        setTimeout(resizeCanvases, 50);
+
+        // Flocking & Swarm Guidance Engine (Reynolds Flocking + Potential Fields)
+        function updateSwarmPhysics() {
+            swarm.time += 0.03;
+
+            // Target Waypoint Motion (Orbit or Patrol)
+            if (swarm.isRTH) {
+                swarm.target.x = 0;
+                swarm.target.y = 0;
+            } else {
+                swarm.target.x = Math.sin(swarm.time * 0.4) * 120;
+                swarm.target.y = Math.cos(swarm.time * 0.3) * 80;
+            }
+
+            // Compute ideal formation offset for each drone
+            for (let i = 0; i < swarm.drones.length; i++) {
+                const d = swarm.drones[i];
+                let targetOffsetX = 0;
+                let targetOffsetY = 0;
+
+                if (swarm.formation === 'v') {
+                    // V-Formation
+                    const side = i % 2 === 0 ? 1 : -1;
+                    const rank = Math.floor((i + 1) / 2);
+                    targetOffsetX = side * rank * swarm.spacing;
+                    targetOffsetY = -rank * swarm.spacing * 0.8;
+                } else if (swarm.formation === 'grid') {
+                    // Grid Search (Rows and Columns)
+                    const cols = 4;
+                    const row = Math.floor(i / cols);
+                    const col = i % cols;
+                    targetOffsetX = (col - (cols - 1) / 2) * swarm.spacing;
+                    targetOffsetY = (row - 1.5) * swarm.spacing;
+                } else if (swarm.formation === 'circle') {
+                    // Perimeter Circle
+                    const angle = (i / swarm.count) * Math.PI * 2;
+                    const radius = (swarm.count * swarm.spacing) / (2 * Math.PI);
+                    targetOffsetX = Math.cos(angle) * radius;
+                    targetOffsetY = Math.sin(angle) * radius;
+                } else if (swarm.formation === 'line') {
+                    // Line Sweep
+                    targetOffsetX = (i - (swarm.count - 1) / 2) * swarm.spacing;
+                    targetOffsetY = 0;
+                }
+
+                // Desired Position in World Frame
+                const desiredX = swarm.target.x + targetOffsetX;
+                const desiredY = swarm.target.y + targetOffsetY;
+
+                // Cohesion + Attraction to formation slot
+                const fx = (desiredX - d.x) * 0.08 * swarm.cohesion;
+                const fy = (desiredY - d.y) * 0.08 * swarm.cohesion;
+
+                // Separation: Repel if too close to neighbor drones
+                let sepX = 0, sepY = 0;
+                for (let j = 0; j < swarm.drones.length; j++) {
+                    if (i === j) continue;
+                    const other = swarm.drones[j];
+                    const dist = Math.hypot(d.x - other.x, d.y - other.y);
+                    if (dist < swarm.spacing * 0.7 && dist > 0.01) {
+                        const force = (swarm.spacing * 0.7 - dist) / dist;
+                        sepX += (d.x - other.x) * force * 0.15;
+                        sepY += (d.y - other.y) * force * 0.15;
+                    }
+                }
+
+                // Accelerate
+                d.vx += (fx + sepX);
+                d.vy += (fy + sepY);
+
+                // Damping / Max velocity clamp
+                const speed = Math.hypot(d.vx, d.vy);
+                const maxSpeed = 16.0; // m/s
+                if (speed > maxSpeed) {
+                    d.vx = (d.vx / speed) * maxSpeed;
+                    d.vy = (d.vy / speed) * maxSpeed;
+                }
+                d.vx *= 0.94;
+                d.vy *= 0.94;
+
+                d.x += d.vx;
+                d.y += d.vy;
+                d.heading = Math.atan2(d.vy, d.vx);
+            }
+        }
+
+        // Live MAVLink Stream Simulator
+        const mavlog = document.getElementById('mavlogStream');
+        let packetSeq = 100;
+        setInterval(() => {
+            packetSeq++;
+            const randDrone = Math.floor(Math.random() * swarm.count) + 1;
+            const lat = (18.2164 + (Math.random() - 0.5) * 0.01).toFixed(6);
+            const lon = (42.5053 + (Math.random() - 0.5) * 0.01).toFixed(6);
+            const msgs = [
+                `[#${packetSeq}] UAV_${randDrone} GLOBAL_POS: lat=${lat}° lon=${lon}° alt=${swarm.altitude}m`,
+                `[#${packetSeq}] UAV_${randDrone} SYS_STATUS: batt=22.2V rssi=-68dBm errors=0`,
+                `[#${packetSeq}] UAV_${randDrone} ATTITUDE: pitch=3.2° roll=-1.4° yaw=142°`,
+                `[#${packetSeq}] SWARM_COORD: slots=${swarm.count} form=${swarm.formation.toUpperCase()} sep=${swarm.spacing}m`
+            ];
+            const p = document.createElement('div');
+            p.textContent = msgs[Math.floor(Math.random() * msgs.length)];
+            mavlog.appendChild(p);
+            if(mavlog.children.length > 20) mavlog.removeChild(mavlog.children[0]);
+            mavlog.scrollTop = mavlog.scrollHeight;
+        }, 600);
+
+        // Render Tactical Radar Viewport
+        function renderTactical() {
+            updateSwarmPhysics();
+
+            const w = canvasT.width;
+            const h = canvasT.height;
+            if(!w || !h) return;
+
+            ctxT.clearRect(0, 0, w, h);
+            ctxT.save();
+
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = 2.2 * (window.devicePixelRatio || 1);
+
+            ctxT.translate(cx, cy);
+
+            // Radar Concentric Range Rings
+            ctxT.strokeStyle = 'rgba(14, 165, 233, 0.12)';
+            ctxT.lineWidth = 1;
+            for(let r = 50; r <= 350; r += 50) {
+                ctxT.beginPath();
+                ctxT.arc(0, 0, r * (scale * 0.4), 0, Math.PI * 2);
+                ctxT.stroke();
+            }
+
+            // Radar Crosshairs
+            ctxT.beginPath();
+            ctxT.moveTo(-w/2, 0); ctxT.lineTo(w/2, 0);
+            ctxT.moveTo(0, -h/2); ctxT.lineTo(0, h/2);
+            ctxT.stroke();
+
+            // Geofence Boundary Polygon
+            if (swarm.showGeofence) {
+                const geoRadius = 240 * (scale * 0.4);
+                ctxT.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+                ctxT.lineWidth = 2;
+                ctxT.setLineDash([8, 6]);
+                ctxT.beginPath();
+                ctxT.arc(0, 0, geoRadius, 0, Math.PI * 2);
+                ctxT.stroke();
+                ctxT.setLineDash([]);
+
+                ctxT.fillStyle = '#ef4444';
+                ctxT.font = `${10 * window.devicePixelRatio}px 'JetBrains Mono'`;
+                ctxT.fillText("TACTICAL GEOFENCE (R = 500m)", -geoRadius + 20, -10);
+            }
+
+            // Swarm Mesh Communications Lines (Ad-Hoc Network)
+            ctxT.strokeStyle = 'rgba(14, 165, 233, 0.25)';
+            ctxT.lineWidth = 1;
+            for(let i = 0; i < swarm.drones.length; i++) {
+                for(let j = i + 1; j < swarm.drones.length; j++) {
+                    const d1 = swarm.drones[i];
+                    const d2 = swarm.drones[j];
+                    const dist = Math.hypot(d1.x - d2.x, d1.y - d2.y);
+                    if(dist < swarm.spacing * 2.5) {
+                        ctxT.beginPath();
+                        ctxT.moveTo(d1.x * scale, d1.y * scale);
+                        ctxT.lineTo(d2.x * scale, d2.y * scale);
+                        ctxT.stroke();
+                    }
+                }
+            }
+
+            // Target Flight Waypoint Marker
+            ctxT.fillStyle = '#f59e0b';
+            ctxT.beginPath();
+            ctxT.arc(swarm.target.x * scale, swarm.target.y * scale, 6, 0, Math.PI * 2);
+            ctxT.fill();
+            ctxT.strokeStyle = 'rgba(245, 158, 11, 0.4)';
+            ctxT.lineWidth = 2;
+            ctxT.beginPath();
+            ctxT.arc(swarm.target.x * scale, swarm.target.y * scale, 16, 0, Math.PI * 2);
+            ctxT.stroke();
+
+            // Draw Each Drone Node
+            for(let i = 0; i < swarm.drones.length; i++) {
+                const d = swarm.drones[i];
+                const px = d.x * scale;
+                const py = d.y * scale;
+
+                // Drone Direction Chevron
+                ctxT.save();
+                ctxT.translate(px, py);
+                ctxT.rotate(d.heading);
+
+                ctxT.fillStyle = (i === 0) ? '#38bdf8' : '#10b981';
+                ctxT.beginPath();
+                ctxT.moveTo(8, 0);
+                ctxT.lineTo(-6, 5);
+                ctxT.lineTo(-3, 0);
+                ctxT.lineTo(-6, -5);
+                ctxT.closePath();
+                ctxT.fill();
+
+                ctxT.restore();
+
+                // ID Tag
+                ctxT.fillStyle = '#94a3b8';
+                ctxT.font = `${9 * window.devicePixelRatio}px 'JetBrains Mono'`;
+                ctxT.fillText(`UAV-${d.id}`, px + 8, py - 4);
+            }
+
+            ctxT.restore();
+
+            // Render FLIR Thermal Camera
+            renderFLIR();
+
+            requestAnimationFrame(renderTactical);
+        }
+
+        // Render FLIR Infrared Camera Feed
+        function renderFLIR() {
+            const fw = canvasF.width;
+            const fh = canvasF.height;
+            if(!fw || !fh) return;
+
+            ctxF.clearRect(0, 0, fw, fh);
+            ctxF.save();
+
+            // Thermal Gray/Green/Orange Color Palette
+            const grad = ctxF.createLinearGradient(0, 0, 0, fh);
+            grad.addColorStop(0, '#04120a');
+            grad.addColorStop(1, '#020604');
+            ctxF.fillStyle = grad;
+            ctxF.fillRect(0, 0, fw, fh);
+
+            // Crosshair Reticle
+            const fcx = fw / 2;
+            const fcy = fh / 2;
+            ctxF.strokeStyle = '#22c55e';
+            ctxF.lineWidth = 1.5;
+
+            ctxF.beginPath();
+            ctxF.moveTo(fcx - 30, fcy); ctxF.lineTo(fcx - 8, fcy);
+            ctxF.moveTo(fcx + 8, fcy); ctxF.lineTo(fcx + 30, fcy);
+            ctxF.moveTo(fcx, fcy - 30); ctxF.lineTo(fcx, fcy - 8);
+            ctxF.moveTo(fcx, fcy + 8); ctxF.lineTo(fcx, fcy + 30);
+            ctxF.stroke();
+
+            // Target Tracking Bounding Box (Vehicle / Asset Detected)
+            const targetX = fcx + Math.sin(swarm.time * 0.8) * 40;
+            const targetY = fcy + Math.cos(swarm.time * 0.6) * 20;
+            const bw = 50, bh = 35;
+
+            ctxF.strokeStyle = '#f59e0b';
+            ctxF.lineWidth = 2;
+            ctxF.strokeRect(targetX - bw/2, targetY - bh/2, bw, bh);
+
+            ctxF.fillStyle = '#f59e0b';
+            ctxF.font = `${10 * window.devicePixelRatio}px 'JetBrains Mono'`;
+            ctxF.fillText("TRACK 01 [VEHICLE - 98%]", targetX - bw/2, targetY - bh/2 - 6);
+            ctxF.fillText("RANGE: 412m", targetX - bw/2, targetY + bh/2 + 14);
+
+            // Thermal Heat Spot
+            ctxF.fillStyle = 'rgba(245, 158, 11, 0.4)';
+            ctxF.beginPath();
+            ctxF.arc(targetX, targetY, 14, 0, Math.PI * 2);
+            ctxF.fill();
+
+            ctxF.restore();
+        }
+
+        requestAnimationFrame(renderTactical);
+    </script>
+</body>
+</html>
